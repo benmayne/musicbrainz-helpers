@@ -7,6 +7,7 @@ PLUGIN_LICENSE = "GPL-2.0"
 PLUGIN_LICENSE_URL = "https://www.gnu.org/licenses/gpl-2.0.html"
 
 from PyQt5.QtCore import QCoreApplication
+from collections import defaultdict
 
 from picard import log
 from picard.album import Album
@@ -20,4 +21,22 @@ class RemoveAlbumsWithArtwork(BaseAction):
                     self.tagger.remove_album(album)
             QCoreApplication.processEvents()
 
+class FindDupeAlbums(BaseAction):
+    NAME = 'Find Dupe Release Groups'
+
+    def __init__(self):
+        super().__init__()
+        self.albums_by_release_group = defaultdict(list)
+
+    def callback(self, objs):
+        for album in objs:
+            if (isinstance(album, Album) and album.loaded):
+                self.albums_by_release_group[album.metadata["musicbrainz_releasegroupid"]].append(album)
+        for albums in self.albums_by_release_group.values():
+            if (len(albums) == 1):
+                self.tagger.remove_album(albums[0])
+            QCoreApplication.processEvents()
+        self.albums_by_release_group = defaultdict(list)
+
 register_album_action(RemoveAlbumsWithArtwork())
+register_album_action(FindDupeAlbums())
