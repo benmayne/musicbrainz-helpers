@@ -4,10 +4,15 @@
 // @description  One-click importing of audiobook releases from Amazon into MusicBrainz
 // @version      0.1
 // @match        https://www.amazon.com/*/dp/*
+// @match        https://www.amazon.com/dp/*
 // @match        https://www.amazon.co.uk/*/dp/*
+// @match        https://www.amazon.co.uk/dp/*
 // @match        https://www.amazon.de/*/dp/*
+// @match        https://www.amazon.de/dp/*
 // @match        https://www.amazon.fr/*/dp/*
+// @match        https://www.amazon.fr/dp/*
 // @match        https://www.amazon.co.jp/*/dp/*
+// @match        https://www.amazon.co.jp/dp/*
 // @grant        none
 // ==/UserScript==
 
@@ -110,7 +115,8 @@
         // --- Title ---
         const titleEl =
             document.querySelector('#productTitle') ||
-            document.querySelector('#title span:first-child');
+            document.querySelector('#title span:first-child') ||
+            document.querySelector('#centerCol h4');
 
         if (titleEl) {
             let title = titleEl.textContent.trim();
@@ -212,8 +218,8 @@
         };
 
         add('name', data.title);
-        add('type', 'other');
-        add('secondary_types', 'Audiobook');
+        add('type', 'Other');
+        add('type', 'Audiobook');
         add('status', 'official');
         add('packaging', 'none');
         add('language', data.language);
@@ -232,7 +238,7 @@
         }
 
         add('urls.0.url', data.url);
-        add('urls.0.link_type', '79'); // purchase for mail-order
+        add('urls.0.link_type', '77'); // Amazon ASIN
 
         add('edit_note', `Imported from ${data.url}`);
 
@@ -300,7 +306,8 @@
         const anchor =
             document.querySelector('#title_feature_div') ||
             document.querySelector('#titleSection') ||
-            document.querySelector('#productTitle');
+            document.querySelector('#centerCol h4')?.parentElement ||
+            document.querySelector('#centerCol');
 
         if (anchor) {
             anchor.appendChild(form);
@@ -318,12 +325,13 @@
      * Returns true if the page appears to be an Audible Audiobook product.
      */
     function isAudiobook() {
-        const titleSection =
+        const section =
             document.querySelector('#title_feature_div') ||
-            document.querySelector('#titleSection');
+            document.querySelector('#titleSection') ||
+            document.querySelector('#centerCol');
 
-        if (!titleSection) return false;
-        return /audible audiobook/i.test(titleSection.textContent);
+        if (!section) return false;
+        return /audible audiobook/i.test(section.textContent);
     }
 
     // ---------------------------------------------------------------------------
