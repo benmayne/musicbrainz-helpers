@@ -193,8 +193,10 @@
             if (asinMatch) data.asin = asinMatch[1].toUpperCase();
         }
 
-        // --- Clean URL (strip query params and hash) ---
-        data.url = window.location.origin + window.location.pathname;
+        // --- Clean URL (strip query params, hash, and referral path) ---
+        let pathname = window.location.pathname;
+        pathname = pathname.replace(/\/ref=.*$/, '/');
+        data.url = window.location.origin + pathname;
 
         return data;
     }
@@ -240,7 +242,7 @@
         add('urls.0.url', data.url);
         add('urls.0.link_type', '77'); // Amazon ASIN
 
-        add('edit_note', `Imported from ${data.url}`);
+        add('edit_note', `Imported from ${data.url} using userscripts from https://github.com/benmayne/musicbrainz-helpers/`);
 
         // Artist credits
         if (data.author) {
