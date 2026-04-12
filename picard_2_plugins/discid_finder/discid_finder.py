@@ -2,8 +2,8 @@ PLUGIN_NAME = 'Disc ID Finder'
 PLUGIN_AUTHOR = 'benmayne'
 PLUGIN_DESCRIPTION = (
     'Identifies releases that have a ripping log (XLD/EAC) but no disc ID '
-    'in MusicBrainz. Select albums and use "Remove albums with disc IDs or '
-    'no ripping log" to filter down to releases that need a disc ID submitted.'
+    'in MusicBrainz. Select albums and use "Keep only albums with log and '
+    'no disc ID" to filter down to releases that need a disc ID submitted.'
 )
 PLUGIN_VERSION = '0.1'
 PLUGIN_API_VERSIONS = ['2.6', '2.7', '2.8', '2.9', '2.10', '2.11', '2.12', '2.13']
