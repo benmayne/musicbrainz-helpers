@@ -2,7 +2,7 @@
 // @name         Import Amazon Audiobooks into MusicBrainz
 // @namespace    https://github.com/benmayne/musicbrainz-helpers
 // @description  One-click importing of audiobook releases from Amazon into MusicBrainz
-// @version      0.2
+// @version      0.3
 // @match        https://www.amazon.com/*/dp/*
 // @match        https://www.amazon.com/dp/*
 // @match        https://www.amazon.co.uk/*/dp/*
@@ -141,14 +141,15 @@
             let container = link.parentElement;
             while (container && container !== document.body) {
                 const text = container.textContent;
-                if (text.includes('(Author)') || text.includes('- Author')) {
+                const hasAuthor = /\bAuthor\b/.test(text);
+                const hasNarrator = /\bNarrator\b/.test(text);
+                if (hasAuthor) {
                     if (!data.author) data.author = name;
-                    break;
                 }
-                if (text.includes('(Narrator)') || text.includes('- Narrator')) {
+                if (hasNarrator) {
                     if (!data.narrator) data.narrator = name;
-                    break;
                 }
+                if (hasAuthor || hasNarrator) break;
                 container = container.parentElement;
             }
 
