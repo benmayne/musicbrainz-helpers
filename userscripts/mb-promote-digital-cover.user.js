@@ -259,6 +259,143 @@
     }
 
     // ---------------------------------------------------------------------------
+    // Preview panel (preview mode)
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Build a single "slot" column (Current or Proposed).
+     * @param {{label: string, imageUrl: string|null, caption: string, placeholderText: string}} args
+     * @returns {HTMLElement}
+     */
+    function buildPreviewSlot({ label, imageUrl, caption, placeholderText }) {
+        const col = document.createElement('div');
+        col.style.cssText = 'flex: 1; text-align: center; padding: 0.5em;';
+
+        const heading = document.createElement('div');
+        heading.textContent = label;
+        heading.style.cssText = 'font-weight: bold; margin-bottom: 0.5em; font-size: 1em;';
+        col.appendChild(heading);
+
+        if (imageUrl) {
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.alt = label;
+            img.style.cssText = 'max-width: 100%; max-height: 500px; border: 1px solid #ccc; background: #f9f9f9;';
+            img.onerror = () => {
+                img.replaceWith(buildPlaceholder('(cover art unavailable)'));
+            };
+            col.appendChild(img);
+        } else {
+            col.appendChild(buildPlaceholder(placeholderText));
+        }
+
+        const cap = document.createElement('div');
+        cap.className = 'promote-digital-cover-caption';
+        cap.textContent = caption;
+        cap.style.cssText = 'margin-top: 0.5em; font-size: 0.9em; color: #555;';
+        col.appendChild(cap);
+
+        return col;
+    }
+
+    function buildPlaceholder(text) {
+        const p = document.createElement('div');
+        p.textContent = text;
+        p.style.cssText =
+            'height: 300px; display: flex; align-items: center; justify-content: center; border: 1px dashed #ccc; background: #f9f9f9; color: #888;';
+        return p;
+    }
+
+    /**
+     * Format release metadata for the caption.
+     * @param {object|null} release
+     * @returns {string}
+     */
+    function captionForRelease(release) {
+        if (!release) return '';
+        const formats = (release.media || []).map((m) => m.format).filter(Boolean).join(' + ');
+        const bits = [release.title || '(untitled)'];
+        if (formats) bits.push(formats);
+        if (release.date) bits.push(release.date);
+        return bits.join(' · ');
+    }
+
+    /**
+     * Build the full preview panel with both slots.
+     * @param {{
+     *   rgMbid: string,
+     *   currentRelease: object|null,
+     *   proposedRelease: object|null,
+     *   hasCurrentCover: boolean,
+     * }} args
+     * @returns {HTMLElement}
+     */
+    function buildPreviewPanel({ rgMbid, currentRelease, proposedRelease, hasCurrentCover }) {
+        const panel = document.createElement('div');
+        panel.className = 'promote-digital-cover-preview';
+        panel.style.cssText =
+            'margin: 1em 0; padding: 1em; border: 1px solid #ccc; background: #fffbe6; border-radius: 3px;';
+
+        const heading = document.createElement('div');
+        heading.textContent = 'Cover art comparison';
+        heading.style.cssText = 'font-weight: bold; margin-bottom: 0.5em;';
+        panel.appendChild(heading);
+
+        const row = document.createElement('div');
+        row.style.cssText = 'display: flex; gap: 1em; align-items: flex-start;';
+
+        row.appendChild(
+            buildPreviewSlot({
+                label: 'Current release group cover',
+                imageUrl: hasCurrentCover ? CAA_RELEASE_GROUP_FRONT(rgMbid, 500) : null,
+                caption: hasCurrentCover
+                    ? `From: ${captionForRelease(currentRelease)}`
+                    : '(no current cover)',
+                placeholderText: 'No current cover',
+            })
+        );
+
+        const proposedUrl =
+            proposedRelease && hasUsableFrontCover(proposedRelease)
+                ? CAA_RELEASE_FRONT(proposedRelease.id, 500)
+                : null;
+        row.appendChild(
+            buildPreviewSlot({
+                label: 'Proposed',
+                imageUrl: proposedUrl,
+                caption: proposedRelease
+                    ? `From: ${captionForRelease(proposedRelease)}`
+                    : '(select a release below)',
+                placeholderText: proposedRelease
+                    ? '(no cover art uploaded)'
+                    : '(select a release below)',
+            })
+        );
+
+        panel.appendChild(row);
+        return panel;
+    }
+
+    /**
+     * Insert the preview panel at the top of the set-cover-art form.
+     * Returns the inserted panel, or null if no hook was found.
+     * @param {HTMLElement} panelEl
+     * @returns {HTMLElement|null}
+     */
+    function insertPreviewPanel(panelEl) {
+        // MB's set-cover-art page has a <form> for selecting the release.
+        // Insert the panel just above it so it appears near the top of the
+        // content area.
+        const form = document.querySelector('#content form, form.set-cover-art');
+        if (!form) {
+            console.warn('[promote-digital-cover] set-cover-art form not found');
+            return null;
+        }
+        form.parentNode.insertBefore(panelEl, form);
+        return panelEl;
+    }
+
+    // ---------------------------------------------------------------------------
     // Entry point / mode dispatch
     // ---------------------------------------------------------------------------
 
@@ -277,7 +414,7 @@
 
     if (SET_COVER_ART_RE.test(path)) {
         console.log('[promote-digital-cover] preview mode');
-        // runPreviewMode() — added in later tasks
+        runPreviewMode();
         return;
     }
 
@@ -318,5 +455,46 @@
 
         const block = buildPromoteButtonBlock({ rgMbid, target });
         insertButtonBlock(block);
+    }
+
+    async function runPreviewMode() {
+        const rgMbid = mbidFromPath(SET_COVER_ART_RE);
+        if (!rgMbid) return;
+
+        const [mbData, caaData] = await Promise.all([
+            fetchReleaseGroupData(rgMbid),
+            fetchCaaReleaseGroup(rgMbid),
+        ]);
+        if (!mbData) return;
+
+        const classified = classifyReleases(mbData, caaData);
+        const releasesById = new Map(classified.allReleases.map((r) => [r.id, r]));
+
+        const hash = location.hash || '';
+        const hashMatch = hash.match(/#promote=([0-9a-f-]{36})/i);
+        const initialMbid = hashMatch ? hashMatch[1].toLowerCase() : null;
+        const initialRelease = initialMbid ? releasesById.get(initialMbid) : null;
+
+        const currentRelease = classified.currentCoverMbid
+            ? releasesById.get(classified.currentCoverMbid)
+            : null;
+        const hasCurrentCover = !!classified.currentCoverMbid;
+
+        const panel = buildPreviewPanel({
+            rgMbid,
+            currentRelease,
+            proposedRelease: initialRelease,
+            hasCurrentCover,
+        });
+        insertPreviewPanel(panel);
+
+        // Expose state for Task 7's live-update wiring.
+        window.__promoteDigitalCoverState = {
+            rgMbid,
+            releasesById,
+            panel,
+            hasCurrentCover,
+            currentRelease,
+        };
     }
 })();
