@@ -104,6 +104,28 @@ def _classify(releases, current_cover_mbid):
     }
 
 
+def _keep_album(classified, mode):
+    """Decide whether an album should be kept based on its RG classification.
+
+    Strict mode: keep iff current RG cover is non-digital AND at least one
+    digital release has usable front cover art.
+
+    Broad mode: keep iff current RG cover is non-digital AND at least one
+    digital release exists in the RG.
+    """
+    if classified['current_cover_is_digital']:
+        return False
+    digital = classified['digital_releases']
+    if not digital:
+        return False
+    if mode == MODE_STRICT:
+        return any(_has_usable_front_cover(r) for r in digital)
+    if mode == MODE_BROAD:
+        return True
+    # Unknown mode — be conservative.
+    return True
+
+
 class KeepAlbumsWithPromotableDigitalCover(BaseAction):
     NAME = 'Keep albums where a digital cover is ready to promote'
 
