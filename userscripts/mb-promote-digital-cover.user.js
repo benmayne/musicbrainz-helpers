@@ -188,6 +188,77 @@
     }
 
     // ---------------------------------------------------------------------------
+    // Button rendering (button mode)
+    // ---------------------------------------------------------------------------
+
+    // Selectors confirmed during Task 5 Step 1 recon. Keep both to be defensive.
+    const COVER_ART_SELECTOR = 'div.cover-art, div.coverart';
+
+    /**
+     * Describe a release in the subtext line. Prefers title + date.
+     * @param {object} release
+     * @returns {string}
+     */
+    function describeRelease(release) {
+        const parts = [release.title || '(untitled release)'];
+        if (release.date) parts.push(release.date);
+        if (release.country) parts.push(release.country);
+        return parts.join(', ');
+    }
+
+    /**
+     * Build the promote button + subtext block.
+     * @param {{ rgMbid: string, target: { release: object, hasCover: boolean } }} args
+     * @returns {HTMLElement}
+     */
+    function buildPromoteButtonBlock({ rgMbid, target }) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'promote-digital-cover-block';
+        wrapper.style.cssText =
+            'margin-top: 0.5em; padding: 0.5em; border: 1px solid #ccc; background: #fffbe6; border-radius: 3px;';
+
+        const button = document.createElement('a');
+        const rid = target.release.id;
+        if (target.hasCover) {
+            button.href = `/release-group/${rgMbid}/set-cover-art#promote=${rid}`;
+            button.textContent = 'Promote digital cover to release group →';
+        } else {
+            button.href = `/release/${rid}/add-cover-art`;
+            button.textContent = 'Add cover art to digital release →';
+        }
+        button.style.cssText =
+            'display: inline-block; padding: 4px 10px; background: #ea6005; color: white; text-decoration: none; border-radius: 3px; font-weight: bold;';
+        wrapper.appendChild(button);
+
+        const subtext = document.createElement('div');
+        subtext.style.cssText = 'margin-top: 0.4em; font-size: 0.9em; color: #555;';
+        if (target.hasCover) {
+            subtext.textContent = `Source: ${describeRelease(target.release)}`;
+        } else {
+            subtext.textContent = `Upload cover art to "${describeRelease(target.release)}" first. You'll still need to set it as the group cover afterward.`;
+        }
+        wrapper.appendChild(subtext);
+
+        return wrapper;
+    }
+
+    /**
+     * Insert the button block immediately after the cover-art container.
+     * Returns true if inserted, false if no hook was found.
+     * @param {HTMLElement} blockEl
+     * @returns {boolean}
+     */
+    function insertButtonBlock(blockEl) {
+        const hook = document.querySelector(COVER_ART_SELECTOR);
+        if (!hook) {
+            console.warn('[promote-digital-cover] cover-art hook not found; selector:', COVER_ART_SELECTOR);
+            return false;
+        }
+        hook.insertAdjacentElement('afterend', blockEl);
+        return true;
+    }
+
+    // ---------------------------------------------------------------------------
     // Entry point / mode dispatch
     // ---------------------------------------------------------------------------
 
@@ -212,7 +283,40 @@
 
     if (BUTTON_MODE_RE.test(path)) {
         console.log('[promote-digital-cover] button mode');
-        // runButtonMode() — added in later tasks
+        runButtonMode();
         return;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Main flows
+    // ---------------------------------------------------------------------------
+
+    async function runButtonMode() {
+        let rgMbid = mbidFromPath(RELEASE_GROUP_RE);
+        if (!rgMbid) {
+            const releaseMbid = mbidFromPath(RELEASE_RE);
+            if (!releaseMbid) return;
+            rgMbid = releaseGroupMbidFromReleasePage();
+            if (!rgMbid) {
+                console.warn('[promote-digital-cover] could not determine RG MBID from release page');
+                return;
+            }
+        }
+
+        const [mbData, caaData] = await Promise.all([
+            fetchReleaseGroupData(rgMbid),
+            fetchCaaReleaseGroup(rgMbid),
+        ]);
+        if (!mbData) return;
+
+        const classified = classifyReleases(mbData, caaData);
+        if (classified.currentCoverIsDigital) return;
+        if (classified.digitalReleases.length === 0) return;
+
+        const target = pickTargetDigitalRelease(classified.digitalReleases);
+        if (!target) return;
+
+        const block = buildPromoteButtonBlock({ rgMbid, target });
+        insertButtonBlock(block);
     }
 })();
