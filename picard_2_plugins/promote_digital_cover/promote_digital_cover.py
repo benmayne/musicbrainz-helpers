@@ -168,17 +168,18 @@ def _process_album(album, mode):
     """Entry point: kick off the async fetch pipeline for one album."""
     metadata = getattr(album, 'metadata', None)
     rg_mbid = metadata.get('musicbrainz_releasegroupid') if metadata is not None else None
+
+    log.debug(
+        '[promote-digital-cover] processing album=%s rg=%s mode=%s',
+        getattr(album, 'id', None), rg_mbid, mode,
+    )
+
     if not rg_mbid:
         log.warning(
             '[promote-digital-cover] album %r has no musicbrainz_releasegroupid; keeping',
             album,
         )
         return
-
-    log.debug(
-        '[promote-digital-cover] processing album=%s rg=%s mode=%s',
-        getattr(album, 'id', None), rg_mbid, mode,
-    )
 
     def on_browse_done(document, http, error):
         _on_browse_done(album, mode, rg_mbid, document, http, error)
@@ -247,8 +248,8 @@ def _on_caa_done(album, mode, rg_mbid, releases, data, http, error):
 def _finalize(album, mode, rg_mbid, classified):
     """Apply the keep predicate, log the decision, and remove the album if needed."""
     album_mbid = getattr(album, 'id', None)
-    cover_mbid = classified['current_cover_mbid']
-    digital_mbids = [r.get('id') for r in classified['digital_releases']]
+    cover_mbid = classified.get('current_cover_mbid')
+    digital_mbids = [r.get('id') for r in classified.get('digital_releases', [])]
 
     if _keep_album(classified, mode):
         log.debug(
