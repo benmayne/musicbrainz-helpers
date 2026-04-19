@@ -266,11 +266,12 @@
 
     /**
      * Build a single "slot" column (Current or Proposed).
-     * @param {{label: string, imageUrl: string|null, caption: string, placeholderText: string}} args
+     * @param {{slotName: string, label: string, imageUrl: string|null, caption: string, placeholderText: string}} args
      * @returns {HTMLElement}
      */
-    function buildPreviewSlot({ label, imageUrl, caption, placeholderText }) {
+    function buildPreviewSlot({ slotName, label, imageUrl, caption, placeholderText }) {
         const col = document.createElement('div');
+        if (slotName) col.dataset.slot = slotName;
         col.style.cssText = 'flex: 1; text-align: center; padding: 0.5em;';
 
         const heading = document.createElement('div');
@@ -348,6 +349,7 @@
 
         row.appendChild(
             buildPreviewSlot({
+                slotName: 'current',
                 label: 'Current release group cover',
                 imageUrl: hasCurrentCover ? CAA_RELEASE_GROUP_FRONT(rgMbid, 500) : null,
                 caption: hasCurrentCover
@@ -363,6 +365,7 @@
                 : null;
         row.appendChild(
             buildPreviewSlot({
+                slotName: 'proposed',
                 label: 'Proposed',
                 imageUrl: proposedUrl,
                 caption: proposedRelease
@@ -409,7 +412,8 @@
     }
 
     /**
-     * Click the radio whose value matches the given MBID. Returns true if matched.
+     * Check the radio whose value matches the given MBID and dispatch a change event.
+     * Returns true if a match was found.
      * @param {string} mbid
      * @returns {boolean}
      */
@@ -430,13 +434,11 @@
     function updateProposedSlot({ release }) {
         if (!previewState || !previewState.panel) return;
 
-        const panel = previewState.panel;
-        const columns = panel.querySelectorAll(':scope > div:last-child > div');
-        // columns[0] = current, columns[1] = proposed
-        const proposedCol = columns[1];
+        const proposedCol = previewState.panel.querySelector('[data-slot="proposed"]');
         if (!proposedCol) return;
 
         const newSlot = buildPreviewSlot({
+            slotName: 'proposed',
             label: 'Proposed',
             imageUrl:
                 release && hasUsableFrontCover(release)
@@ -569,13 +571,13 @@
             currentRelease,
         };
 
+        wireLiveUpdate();
+
         if (initialMbid) {
             const matched = selectReleaseRadio(initialMbid);
             if (!matched) {
                 console.warn('[promote-digital-cover] could not find radio for', initialMbid);
             }
         }
-
-        wireLiveUpdate();
     }
 })();
