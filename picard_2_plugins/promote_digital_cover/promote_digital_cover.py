@@ -267,8 +267,7 @@ class KeepAlbumsWithPromotableDigitalCover(BaseAction):
     def callback(self, objs):
         for album in objs:
             if isinstance(album, Album) and album.loaded:
-                # Implementation added in later tasks.
-                pass
+                _process_album(album, MODE_STRICT, self.tagger)
             QCoreApplication.processEvents()
 
 
@@ -278,8 +277,7 @@ class KeepAlbumsWithPromotableDigitalRelease(BaseAction):
     def callback(self, objs):
         for album in objs:
             if isinstance(album, Album) and album.loaded:
-                # Implementation added in later tasks.
-                pass
+                _process_album(album, MODE_BROAD, self.tagger)
             QCoreApplication.processEvents()
 
 
