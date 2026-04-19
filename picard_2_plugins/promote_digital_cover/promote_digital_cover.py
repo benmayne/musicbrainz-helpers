@@ -7,7 +7,7 @@ PLUGIN_DESCRIPTION = (
     'in the group, even without cover art).'
 )
 PLUGIN_VERSION = '0.1'
-PLUGIN_API_VERSIONS = ['2.6', '2.7', '2.8', '2.9', '2.10', '2.11', '2.12', '2.13']
+PLUGIN_API_VERSIONS = ['2.10', '2.11', '2.12', '2.13']
 PLUGIN_LICENSE = 'GPL-2.0'
 PLUGIN_LICENSE_URL = 'https://www.gnu.org/licenses/gpl-2.0.html'
 
