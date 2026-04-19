@@ -440,30 +440,23 @@
         return panelEl;
     }
 
-    /**
-     * Find radio inputs in the set-cover-art form that correspond to release options.
-     * Returns an array so callers can filter by value.
-     * @returns {HTMLInputElement[]}
-     */
-    function findReleaseRadios() {
-        return Array.from(
-            document.querySelectorAll('input[type="radio"][name*="release" i]')
-        );
-    }
+    // MB's set-cover-art form uses a React-controlled list of clickable
+    // cards, not radio buttons. Each selectable card is a
+    // `div.editimage[data-gid="<mbid>"][data-selectable="true"]`; clicking
+    // one updates the form's hidden `set-cover-art.release` input.
+    const EDITIMAGE_SELECTOR = '.editimage[data-selectable="true"]';
 
     /**
-     * Check the radio whose value matches the given MBID and dispatch a change event.
-     * Returns true if a match was found.
+     * Click the editimage card whose data-gid matches the given MBID.
+     * Returns true if the matching selectable card was found and clicked.
      * @param {string} mbid
      * @returns {boolean}
      */
-    function selectReleaseRadio(mbid) {
-        const radio = findReleaseRadios().find(
-            (r) => (r.value || '').toLowerCase() === mbid.toLowerCase()
-        );
-        if (!radio) return false;
-        radio.checked = true;
-        radio.dispatchEvent(new Event('change', { bubbles: true }));
+    function selectReleaseCard(mbid) {
+        const selector = `.editimage[data-gid="${mbid.toLowerCase()}"][data-selectable="true"]`;
+        const card = document.querySelector(selector);
+        if (!card) return false;
+        card.click();
         return true;
     }
 
@@ -495,15 +488,14 @@
     }
 
     /**
-     * Attach a change listener to the release picker to update the proposed slot live.
+     * Attach a click listener to the release picker to update the proposed slot live.
      */
     function wireLiveUpdate() {
         if (!previewState) return;
-        document.addEventListener('change', (event) => {
-            const t = event.target;
-            if (!t || t.tagName !== 'INPUT' || t.type !== 'radio') return;
-            if (!(t.name || '').match(/release/i)) return;
-            const mbid = (t.value || '').toLowerCase();
+        document.addEventListener('click', (event) => {
+            const card = event.target.closest(EDITIMAGE_SELECTOR);
+            if (!card) return;
+            const mbid = (card.dataset.gid || '').toLowerCase();
             if (!/^[0-9a-f-]{36}$/.test(mbid)) return;
             const release = previewState.releasesById.get(mbid) || null;
             updateProposedSlot({ release });
@@ -614,9 +606,9 @@
         wireLiveUpdate();
 
         if (initialMbid) {
-            const matched = selectReleaseRadio(initialMbid);
+            const matched = selectReleaseCard(initialMbid);
             if (!matched) {
-                console.warn('[promote-digital-cover] could not find radio for', initialMbid);
+                console.warn('[promote-digital-cover] could not find selectable card for', initialMbid);
             }
         }
     }
