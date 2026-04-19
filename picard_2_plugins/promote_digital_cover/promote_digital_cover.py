@@ -162,7 +162,8 @@ def _source_mbid_from_local_images(album):
 
 def _process_album(album, mode, tagger):
     """Entry point: kick off the async fetch pipeline for one album."""
-    rg_mbid = album.metadata.get('musicbrainz_releasegroupid')
+    metadata = getattr(album, 'metadata', None)
+    rg_mbid = metadata.get('musicbrainz_releasegroupid') if metadata is not None else None
     if not rg_mbid:
         log.warning(
             '[promote-digital-cover] album %r has no musicbrainz_releasegroupid; keeping',
@@ -221,8 +222,8 @@ def _on_browse_done(album, mode, tagger, rg_mbid, document, http, error):
 def _on_caa_done(album, mode, tagger, rg_mbid, releases, data, http, error):
     if error:
         # 404 from CAA means no RG-level cover art exists; treat as None.
-        # Other errors: log and keep the album.
-        if _is_http_404(http):
+        # Other errors: log and keep the album (no _finalize call = no remove).
+        if _is_content_not_found(error):
             classified = _classify(releases, None)
             _finalize(album, mode, tagger, classified)
             return
@@ -240,27 +241,16 @@ def _finalize(album, mode, tagger, classified):
     tagger.remove_album(album)
 
 
-def _is_http_404(http):
-    """Best-effort 404 detection across Picard's http reply shapes."""
-    if http is None:
+def _is_content_not_found(error):
+    """True if the network `error` argument is Qt's ContentNotFoundError (HTTP 404 equivalent)."""
+    try:
+        from PyQt5.QtNetwork import QNetworkReply
+        return error == QNetworkReply.NetworkError.ContentNotFoundError
+    except Exception:
         return False
-    # Picard passes a QNetworkReply; duck-type to stay decoupled.
-    get_status = getattr(http, 'attribute', None)
-    if callable(get_status):
-        try:
-            # 203 = HttpStatusCodeAttribute in Qt; value equals the HTTP status int.
-            from PyQt5.QtNetwork import QNetworkRequest
-            status = http.attribute(QNetworkRequest.HttpStatusCodeAttribute)
-            if status == 404:
-                return True
-        except Exception:
-            pass
-    # Fallback: stringify error.
-    return '404' in str(getattr(http, 'errorString', lambda: '')())
 
 
 def _log_fetch_failure(kind, rg_mbid, http, error):
-    err_str = ''
     try:
         err_str = http.errorString() if http is not None else str(error)
     except Exception:
