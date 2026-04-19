@@ -72,17 +72,36 @@
     }
 
     /**
-     * Fetch release group data with embedded releases + media.
+     * Fetch all releases in a release group (up to 100), each with media and
+     * cover-art-archive metadata. Uses the browse endpoint rather than the
+     * release-group lookup, because the lookup endpoint silently truncates
+     * embedded releases to 25.
+     *
+     * Returns an object shaped like `{ releases: [...] }` so downstream code
+     * can treat it the same as the old release-group lookup response.
+     *
      * @param {string} rgMbid
-     * @returns {Promise<object|null>}
+     * @returns {Promise<{releases: object[]}|null>}
      */
-    function fetchReleaseGroupData(rgMbid) {
-        return fetchJson(`${MB_WS_BASE}/release-group/${rgMbid}?inc=releases+media&fmt=json`);
+    async function fetchReleaseGroupData(rgMbid) {
+        const data = await fetchJson(
+            `${MB_WS_BASE}/release?release-group=${rgMbid}&inc=media&limit=100&fmt=json`
+        );
+        if (!data) return null;
+        const count = data['release-count'];
+        if (typeof count === 'number' && count > 100) {
+            console.warn(
+                '[promote-digital-cover] release group has >100 releases; only the first 100 are considered.',
+                rgMbid
+            );
+        }
+        return { releases: data.releases || [] };
     }
 
     /**
-     * Fetch the CAA JSON listing for a release group (image records with
-     * per-image `release` URLs).
+     * Fetch the CAA JSON listing for a release group. Contains image
+     * records for the release-group's chosen cover; the per-image
+     * `image` URL encodes which release it was sourced from.
      * @param {string} rgMbid
      * @returns {Promise<object|null>}
      */
@@ -108,15 +127,32 @@
 
     /**
      * Extract the MBID of the release that the CAA "front" image is from.
+     *
+     * CAA's release-group response does not include a `release` field on
+     * each image; the release MBID is only visible in the `image` URL
+     * (`http://coverartarchive.org/release/<mbid>/<id>.jpg`). We try
+     * `image` first, then fall back to the `release` or `thumbnails.*`
+     * URLs if present.
+     *
      * @param {object|null} caaData
      * @returns {string|null}
      */
     function currentCoverReleaseMbid(caaData) {
         if (!caaData || !Array.isArray(caaData.images)) return null;
         const front = caaData.images.find((img) => img.front === true);
-        if (!front || typeof front.release !== 'string') return null;
-        const m = front.release.match(/\/release\/([0-9a-f-]{36})/i);
-        return m ? m[1].toLowerCase() : null;
+        if (!front) return null;
+        const candidates = [
+            front.image,
+            front.release,
+            front.thumbnails && front.thumbnails.large,
+            front.thumbnails && front.thumbnails.small,
+        ];
+        for (const url of candidates) {
+            if (typeof url !== 'string') continue;
+            const m = url.match(/\/release\/([0-9a-f-]{36})/i);
+            if (m) return m[1].toLowerCase();
+        }
+        return null;
     }
 
     /**
