@@ -44,6 +44,17 @@ Current plugins target **2.x** (tested on 2.13.3). Key differences to be aware o
 - Built for [Violentmonkey](https://violentmonkey.github.io/)
 - See `userscripts/README.md` for details
 
+### Metadata block requirements
+
+Every userscript must include `@updateURL` and `@downloadURL` pointing at the raw GitHub file on `main`, so Violentmonkey can auto-update installs:
+
+```
+// @updateURL    https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/<filename>.user.js
+// @downloadURL  https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/<filename>.user.js
+```
+
+Bump `@version` on **every** change, including trivial ones (typo fixes, comment edits, whitespace). Violentmonkey only pulls updates when the remote `@version` is higher than the installed one, so an un-bumped change will never reach users.
+
 ## External documentation
 
 - Picard docs: https://picard-docs.musicbrainz.org/

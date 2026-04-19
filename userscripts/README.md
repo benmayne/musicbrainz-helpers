@@ -5,10 +5,18 @@ Browser userscripts for importing and managing data in [MusicBrainz](https://mus
 ## Installation
 
 1. Install [Violentmonkey](https://violentmonkey.github.io/) for your browser
-2. Open the `.user.js` file you want to install (e.g. on GitHub, click "Raw")
-3. Violentmonkey will prompt you to install the script
+2. Click one of the install links below; Violentmonkey will prompt to install
+
+| Script | Install |
+|---|---|
+| Amazon Audiobook Importer | [install](https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js) |
+| Promote Digital Cover Art | [install](https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/mb-promote-digital-cover.user.js) |
 
 For local development, you can also paste the script contents directly into Violentmonkey's editor (Dashboard → New → paste code).
+
+## Updates
+
+Each script declares `@updateURL` / `@downloadURL` pointing at its raw GitHub file. Violentmonkey polls on a schedule (Dashboard → Settings → Update; default once per day) and installs any version with a higher `@version` than the one you have installed. Bump the `@version` header on each release so clients pick up the change.
 
 ## Scripts
 

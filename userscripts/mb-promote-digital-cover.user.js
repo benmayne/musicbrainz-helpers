@@ -3,6 +3,8 @@
 // @namespace    https://github.com/benmayne/musicbrainz-helpers
 // @description  Suggest promoting a digital release's cover art to the release-group level; preview old vs new on the set-cover-art page.
 // @version      0.1
+// @updateURL    https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/mb-promote-digital-cover.user.js
+// @downloadURL  https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/mb-promote-digital-cover.user.js
 // @match        https://musicbrainz.org/release/*
 // @match        https://musicbrainz.org/release-group/*
 // @grant        none

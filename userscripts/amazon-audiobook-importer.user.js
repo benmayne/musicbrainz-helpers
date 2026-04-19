@@ -3,6 +3,8 @@
 // @namespace    https://github.com/benmayne/musicbrainz-helpers
 // @description  One-click importing of audiobook releases from Amazon into MusicBrainz
 // @version      0.3
+// @updateURL    https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
+// @downloadURL  https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @match        https://www.amazon.com/*/dp/*
 // @match        https://www.amazon.com/dp/*
 // @match        https://www.amazon.co.uk/*/dp/*
