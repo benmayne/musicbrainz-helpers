@@ -1,10 +1,13 @@
 PLUGIN_NAME = 'Promote Digital Cover'
 PLUGIN_AUTHOR = 'benmayne'
 PLUGIN_DESCRIPTION = (
-    'Filter loaded albums down to release groups where a digital release\'s '
-    'cover art could be promoted to the release-group level. Two variants: '
-    'strict (digital cover already uploaded) and broad (any digital release '
-    'in the group, even without cover art).'
+    'Two filter actions for loaded albums. '
+    '"Keep albums where a digital cover is ready to promote" keeps only '
+    'release groups whose current cover is non-digital and where a digital '
+    'release has uploaded cover art ready to promote. '
+    '"Keep albums where a digital release could be promoted (including no '
+    'cover art yet)" is broader, also keeping groups where a digital release '
+    'exists but has not had cover art uploaded yet.'
 )
 PLUGIN_VERSION = '0.1'
 PLUGIN_API_VERSIONS = ['2.10', '2.11', '2.12', '2.13']
@@ -12,6 +15,7 @@ PLUGIN_LICENSE = 'GPL-2.0'
 PLUGIN_LICENSE_URL = 'https://www.gnu.org/licenses/gpl-2.0.html'
 
 from PyQt5.QtCore import QCoreApplication
+from PyQt5.QtNetwork import QNetworkReply
 
 from picard import log
 from picard.album import Album
@@ -160,7 +164,7 @@ def _source_mbid_from_local_images(album):
     return None
 
 
-def _process_album(album, mode, tagger):
+def _process_album(album, mode):
     """Entry point: kick off the async fetch pipeline for one album."""
     metadata = getattr(album, 'metadata', None)
     rg_mbid = metadata.get('musicbrainz_releasegroupid') if metadata is not None else None
@@ -172,15 +176,15 @@ def _process_album(album, mode, tagger):
         return
 
     def on_browse_done(document, http, error):
-        _on_browse_done(album, mode, tagger, rg_mbid, document, http, error)
+        _on_browse_done(album, mode, rg_mbid, document, http, error)
 
-    tagger.mb_api.browse_releases(
+    album.tagger.mb_api.browse_releases(
         on_browse_done,
         **{'release-group': rg_mbid, 'limit': 100},
     )
 
 
-def _on_browse_done(album, mode, tagger, rg_mbid, document, http, error):
+def _on_browse_done(album, mode, rg_mbid, document, http, error):
     if error:
         _log_fetch_failure('browse_releases', rg_mbid, http, error)
         return
@@ -199,62 +203,50 @@ def _on_browse_done(album, mode, tagger, rg_mbid, document, http, error):
     # Early bail-out: no digital releases at all → remove immediately.
     if not any(_is_digital_release(r) for r in releases):
         classified = _classify(releases, None)
-        _finalize(album, mode, tagger, classified)
+        _finalize(album, mode, classified)
         return
 
     # Try local image first for the current-cover source.
     source_mbid = _source_mbid_from_local_images(album)
     if source_mbid is not None:
         classified = _classify(releases, source_mbid)
-        _finalize(album, mode, tagger, classified)
+        _finalize(album, mode, classified)
         return
 
     # Fall back to CAA.
     def on_caa_done(data, http_, error_):
-        _on_caa_done(album, mode, tagger, rg_mbid, releases, data, http_, error_)
+        _on_caa_done(album, mode, rg_mbid, releases, data, http_, error_)
 
-    tagger.webservice.get_url(
+    album.tagger.webservice.get_url(
         url='https://coverartarchive.org/release-group/%s' % rg_mbid,
         handler=on_caa_done,
     )
 
 
-def _on_caa_done(album, mode, tagger, rg_mbid, releases, data, http, error):
+def _on_caa_done(album, mode, rg_mbid, releases, data, http, error):
     if error:
         # 404 from CAA means no RG-level cover art exists; treat as None.
         # Other errors: log and keep the album (no _finalize call = no remove).
-        if _is_content_not_found(error):
+        if error == QNetworkReply.NetworkError.ContentNotFoundError:
             classified = _classify(releases, None)
-            _finalize(album, mode, tagger, classified)
+            _finalize(album, mode, classified)
             return
         _log_fetch_failure('CAA release-group', rg_mbid, http, error)
         return
 
     current_mbid = _current_cover_mbid_from_caa(data if isinstance(data, dict) else None)
     classified = _classify(releases, current_mbid)
-    _finalize(album, mode, tagger, classified)
+    _finalize(album, mode, classified)
 
 
-def _finalize(album, mode, tagger, classified):
+def _finalize(album, mode, classified):
     if _keep_album(classified, mode):
         return
-    tagger.remove_album(album)
-
-
-def _is_content_not_found(error):
-    """True if the network `error` argument is Qt's ContentNotFoundError (HTTP 404 equivalent)."""
-    try:
-        from PyQt5.QtNetwork import QNetworkReply
-        return error == QNetworkReply.NetworkError.ContentNotFoundError
-    except Exception:
-        return False
+    album.tagger.remove_album(album)
 
 
 def _log_fetch_failure(kind, rg_mbid, http, error):
-    try:
-        err_str = http.errorString() if http is not None else str(error)
-    except Exception:
-        err_str = str(error)
+    err_str = http.errorString() if http is not None else str(error)
     log.warning(
         '[promote-digital-cover] %s fetch failed for RG %s: %s',
         kind, rg_mbid, err_str,
@@ -267,7 +259,7 @@ class KeepAlbumsWithPromotableDigitalCover(BaseAction):
     def callback(self, objs):
         for album in objs:
             if isinstance(album, Album) and album.loaded:
-                _process_album(album, MODE_STRICT, self.tagger)
+                _process_album(album, MODE_STRICT)
             QCoreApplication.processEvents()
 
 
@@ -277,7 +269,7 @@ class KeepAlbumsWithPromotableDigitalRelease(BaseAction):
     def callback(self, objs):
         for album in objs:
             if isinstance(album, Album) and album.loaded:
-                _process_album(album, MODE_BROAD, self.tagger)
+                _process_album(album, MODE_BROAD)
             QCoreApplication.processEvents()
 
 
