@@ -75,7 +75,6 @@ def _current_cover_mbid_from_caa(caa_data):
             mbid = _source_mbid_from_caa_image_url(candidate)
             if mbid:
                 return mbid
-        return None
     return None
 
 
