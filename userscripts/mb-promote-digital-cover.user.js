@@ -262,6 +262,8 @@
     // Preview panel (preview mode)
     // ---------------------------------------------------------------------------
 
+    let previewState = null;
+
     /**
      * Build a single "slot" column (Current or Proposed).
      * @param {{label: string, imageUrl: string|null, caption: string, placeholderText: string}} args
@@ -395,6 +397,77 @@
         return panelEl;
     }
 
+    /**
+     * Find radio inputs in the set-cover-art form that correspond to release options.
+     * Returns an array so callers can filter by value.
+     * @returns {HTMLInputElement[]}
+     */
+    function findReleaseRadios() {
+        return Array.from(
+            document.querySelectorAll('input[type="radio"][name*="release" i]')
+        );
+    }
+
+    /**
+     * Click the radio whose value matches the given MBID. Returns true if matched.
+     * @param {string} mbid
+     * @returns {boolean}
+     */
+    function selectReleaseRadio(mbid) {
+        const radio = findReleaseRadios().find(
+            (r) => (r.value || '').toLowerCase() === mbid.toLowerCase()
+        );
+        if (!radio) return false;
+        radio.checked = true;
+        radio.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+    }
+
+    /**
+     * Re-render the "Proposed" column of the preview panel.
+     * @param {{release: object|null}} args
+     */
+    function updateProposedSlot({ release }) {
+        if (!previewState || !previewState.panel) return;
+
+        const panel = previewState.panel;
+        const columns = panel.querySelectorAll(':scope > div:last-child > div');
+        // columns[0] = current, columns[1] = proposed
+        const proposedCol = columns[1];
+        if (!proposedCol) return;
+
+        const newSlot = buildPreviewSlot({
+            label: 'Proposed',
+            imageUrl:
+                release && hasUsableFrontCover(release)
+                    ? CAA_RELEASE_FRONT(release.id, 500)
+                    : null,
+            caption: release
+                ? `From: ${captionForRelease(release)}`
+                : '(select a release below)',
+            placeholderText: release
+                ? '(no cover art uploaded)'
+                : '(select a release below)',
+        });
+        proposedCol.replaceWith(newSlot);
+    }
+
+    /**
+     * Attach a change listener to the release picker to update the proposed slot live.
+     */
+    function wireLiveUpdate() {
+        if (!previewState) return;
+        document.addEventListener('change', (event) => {
+            const t = event.target;
+            if (!t || t.tagName !== 'INPUT' || t.type !== 'radio') return;
+            if (!(t.name || '').match(/release/i)) return;
+            const mbid = (t.value || '').toLowerCase();
+            if (!/^[0-9a-f-]{36}$/.test(mbid)) return;
+            const release = previewState.releasesById.get(mbid) || null;
+            updateProposedSlot({ release });
+        });
+    }
+
     // ---------------------------------------------------------------------------
     // Entry point / mode dispatch
     // ---------------------------------------------------------------------------
@@ -488,13 +561,21 @@
         });
         insertPreviewPanel(panel);
 
-        // Expose state for Task 7's live-update wiring.
-        window.__promoteDigitalCoverState = {
+        previewState = {
             rgMbid,
             releasesById,
             panel,
             hasCurrentCover,
             currentRelease,
         };
+
+        if (initialMbid) {
+            const matched = selectReleaseRadio(initialMbid);
+            if (!matched) {
+                console.warn('[promote-digital-cover] could not find radio for', initialMbid);
+            }
+        }
+
+        wireLiveUpdate();
     }
 })();
