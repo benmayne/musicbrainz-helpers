@@ -143,6 +143,51 @@
     }
 
     // ---------------------------------------------------------------------------
+    // Target release picker
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Sort key for "oldest first": date ascending, MBID as tie-breaker.
+     * Missing date sorts after present dates (so dated releases win).
+     * @param {object} release
+     * @returns {string}
+     */
+    function oldestSortKey(release) {
+        const date = release.date && release.date.length > 0 ? release.date : '9999-99-99';
+        return `${date}|${release.id}`;
+    }
+
+    /**
+     * Consider a release to have usable front cover art only if
+     * artwork/front are true AND darkened is false.
+     * @param {object} release
+     * @returns {boolean}
+     */
+    function hasUsableFrontCover(release) {
+        const caa = release['cover-art-archive'] || {};
+        return caa.artwork === true && caa.front === true && caa.darkened !== true;
+    }
+
+    /**
+     * Pick the digital release to target:
+     *   - Prefer the oldest digital release with usable front cover art.
+     *   - Otherwise, the oldest digital release overall.
+     *   - Null if there are no digital releases.
+     *
+     * @param {object[]} digitalReleases
+     * @returns {{ release: object, hasCover: boolean }|null}
+     */
+    function pickTargetDigitalRelease(digitalReleases) {
+        if (digitalReleases.length === 0) return null;
+        const sorted = [...digitalReleases].sort((a, b) =>
+            oldestSortKey(a).localeCompare(oldestSortKey(b))
+        );
+        const withCover = sorted.find(hasUsableFrontCover);
+        if (withCover) return { release: withCover, hasCover: true };
+        return { release: sorted[0], hasCover: false };
+    }
+
+    // ---------------------------------------------------------------------------
     // Entry point / mode dispatch
     // ---------------------------------------------------------------------------
 
