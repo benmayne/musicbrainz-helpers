@@ -26,6 +26,17 @@ Bulk filtering actions for loaded albums:
 - **Remove Albums With Artwork** — removes albums that already have front cover art
 - **Find Dupe Release Groups** — removes albums that aren't duplicates, leaving only releases that share a release group
 
+### Promote Digital Cover
+
+**File:** `picard_2_plugins/promote_digital_cover/promote_digital_cover.py`
+
+Filters loaded albums down to release groups whose cover art could be upgraded by promoting a digital release's cover to the release-group level. Two variants:
+
+- **Keep albums where a digital cover is ready to promote** (strict) — the release group's current cover is not from a digital release, and at least one digital release in the group has uploaded cover art. Ready for a one-click promotion in MusicBrainz.
+- **Keep albums where a digital release could be promoted (including no cover art yet)** (broad) — same as strict, plus cases where a digital release exists but hasn't had cover art uploaded yet.
+
+Uses Picard's web-service queue for rate-limited async fetches; if you have the "Cover Art Archive: Release Group" provider enabled, the plugin reuses Picard's pre-downloaded RG cover to avoid one CAA round-trip per album.
+
 ## Userscripts
 
 Browser userscripts for [Violentmonkey](https://violentmonkey.github.io/). See [userscripts/README.md](userscripts/README.md) for installation and details.
