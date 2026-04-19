@@ -160,6 +160,117 @@ def _source_mbid_from_local_images(album):
     return None
 
 
+def _process_album(album, mode, tagger):
+    """Entry point: kick off the async fetch pipeline for one album."""
+    rg_mbid = album.metadata.get('musicbrainz_releasegroupid')
+    if not rg_mbid:
+        log.warning(
+            '[promote-digital-cover] album %r has no musicbrainz_releasegroupid; keeping',
+            album,
+        )
+        return
+
+    def on_browse_done(document, http, error):
+        _on_browse_done(album, mode, tagger, rg_mbid, document, http, error)
+
+    tagger.mb_api.browse_releases(
+        on_browse_done,
+        **{'release-group': rg_mbid, 'limit': 100},
+    )
+
+
+def _on_browse_done(album, mode, tagger, rg_mbid, document, http, error):
+    if error:
+        _log_fetch_failure('browse_releases', rg_mbid, http, error)
+        return
+    if not isinstance(document, dict):
+        log.warning('[promote-digital-cover] browse_releases: unexpected payload for %s', rg_mbid)
+        return
+
+    releases = document.get('releases') or []
+    release_count = document.get('release-count')
+    if isinstance(release_count, int) and release_count > 100:
+        log.warning(
+            '[promote-digital-cover] RG %s has %d releases; only the first 100 considered',
+            rg_mbid, release_count,
+        )
+
+    # Early bail-out: no digital releases at all → remove immediately.
+    if not any(_is_digital_release(r) for r in releases):
+        classified = _classify(releases, None)
+        _finalize(album, mode, tagger, classified)
+        return
+
+    # Try local image first for the current-cover source.
+    source_mbid = _source_mbid_from_local_images(album)
+    if source_mbid is not None:
+        classified = _classify(releases, source_mbid)
+        _finalize(album, mode, tagger, classified)
+        return
+
+    # Fall back to CAA.
+    def on_caa_done(data, http_, error_):
+        _on_caa_done(album, mode, tagger, rg_mbid, releases, data, http_, error_)
+
+    tagger.webservice.get_url(
+        url='https://coverartarchive.org/release-group/%s' % rg_mbid,
+        handler=on_caa_done,
+    )
+
+
+def _on_caa_done(album, mode, tagger, rg_mbid, releases, data, http, error):
+    if error:
+        # 404 from CAA means no RG-level cover art exists; treat as None.
+        # Other errors: log and keep the album.
+        if _is_http_404(http):
+            classified = _classify(releases, None)
+            _finalize(album, mode, tagger, classified)
+            return
+        _log_fetch_failure('CAA release-group', rg_mbid, http, error)
+        return
+
+    current_mbid = _current_cover_mbid_from_caa(data if isinstance(data, dict) else None)
+    classified = _classify(releases, current_mbid)
+    _finalize(album, mode, tagger, classified)
+
+
+def _finalize(album, mode, tagger, classified):
+    if _keep_album(classified, mode):
+        return
+    tagger.remove_album(album)
+
+
+def _is_http_404(http):
+    """Best-effort 404 detection across Picard's http reply shapes."""
+    if http is None:
+        return False
+    # Picard passes a QNetworkReply; duck-type to stay decoupled.
+    get_status = getattr(http, 'attribute', None)
+    if callable(get_status):
+        try:
+            # 203 = HttpStatusCodeAttribute in Qt; value equals the HTTP status int.
+            from PyQt5.QtNetwork import QNetworkRequest
+            status = http.attribute(QNetworkRequest.HttpStatusCodeAttribute)
+            if status == 404:
+                return True
+        except Exception:
+            pass
+    # Fallback: stringify error.
+    return '404' in str(getattr(http, 'errorString', lambda: '')())
+
+
+def _log_fetch_failure(kind, rg_mbid, http, error):
+    err_str = ''
+    try:
+        err_str = http.errorString() if http is not None else str(error)
+    except Exception:
+        err_str = str(error)
+    log.warning(
+        '[promote-digital-cover] %s fetch failed for RG %s: %s',
+        kind, rg_mbid, err_str,
+    )
+
+
 class KeepAlbumsWithPromotableDigitalCover(BaseAction):
     NAME = 'Keep albums where a digital cover is ready to promote'
 
