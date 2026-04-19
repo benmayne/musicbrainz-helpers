@@ -17,6 +17,14 @@ from picard import log
 from picard.album import Album
 from picard.ui.itemviews import BaseAction, register_album_action
 
+try:
+    from picard.coverart.providers.caa_release_group import CaaCoverArtImageRg
+except ImportError:
+    # Older Picard 2.x builds may not expose this; provide a sentinel class
+    # so isinstance() below always returns False.
+    class CaaCoverArtImageRg:
+        pass
+
 import re
 
 
@@ -124,6 +132,32 @@ def _keep_album(classified, mode):
         return True
     # Unknown mode — be conservative.
     return True
+
+
+def _source_mbid_from_local_images(album):
+    """Try to determine the RG cover source release MBID from images Picard
+    has already downloaded for this album. Returns an MBID string or None.
+
+    Only `CaaCoverArtImageRg` instances are considered — the generic
+    `CaaCoverArtImage` uses the album's own release MBID in its URL, which
+    can't distinguish scenario 4 (RG cover is from this release) from
+    scenario 1 (RG cover is from a different release that happens to match).
+    """
+    images = []
+    metadata = getattr(album, 'metadata', None)
+    if metadata is not None:
+        images = getattr(metadata, 'images', None) or []
+    for img in images:
+        if not isinstance(img, CaaCoverArtImageRg):
+            continue
+        url = getattr(img, 'url', None)
+        # Picard wraps URLs as QUrl; stringify.
+        if url is not None and not isinstance(url, str):
+            url = url.toString()
+        mbid = _source_mbid_from_caa_image_url(url)
+        if mbid:
+            return mbid
+    return None
 
 
 class KeepAlbumsWithPromotableDigitalCover(BaseAction):
