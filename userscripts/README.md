@@ -38,3 +38,27 @@ Adds an "Import into MusicBrainz" button to Amazon audiobook (Audible) product p
 - Release date parsing only works on English-language Amazon pages
 - Only captures the first author and first narrator
 - Imports a single track (chapter splitting must be done manually in MusicBrainz)
+
+### Promote Digital Cover Art
+
+**File:** `mb-promote-digital-cover.user.js`
+
+Nudges MusicBrainz editors to promote a digital release's cover art to the release-group level. Digital releases usually have higher-quality artwork than scans of physical media; when the release group's current cover comes from a non-digital release and a digital release exists in the group, the script adds a button beneath the cover image.
+
+On the `/release-group/<mbid>/set-cover-art` edit page, the script injects a side-by-side preview of the current cover versus the proposed cover, and auto-selects the suggested release in the form. The preview updates live if the editor picks a different release.
+
+**Supported pages:** `musicbrainz.org/release/*`, `musicbrainz.org/release-group/*` (including `/set-cover-art`).
+
+**Testing:**
+
+1. Find a release group whose current cover is sourced from a physical release (e.g., a CD scan) while a digital release in the group has its own uploaded cover art.
+2. Load the RG page or any release in it. A button labelled **"Promote digital cover to release group →"** should appear below the cover image.
+3. Click the button. You'll land on the set-cover-art page with the digital release pre-selected and a side-by-side comparison at the top.
+4. Change the selected release in the form; the "Proposed" image should update live.
+5. If instead the group has a digital release with no cover art yet, the button reads **"Add cover art to digital release →"** and takes you to that release's upload page.
+
+**Known limitations:**
+
+- Runs once on page load; doesn't react to MB's in-place navigation.
+- Strict format check: only `Digital Media` counts as digital (not `Download Card` or hybrid digital+physical releases).
+- "Oldest digital release" heuristic picks the target; there's no UI for picking a specific digital release to promote.
