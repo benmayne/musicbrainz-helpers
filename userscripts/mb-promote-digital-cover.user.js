@@ -91,6 +91,58 @@
     }
 
     // ---------------------------------------------------------------------------
+    // Classification
+    // ---------------------------------------------------------------------------
+
+    /**
+     * A release is "digital" iff every medium has format exactly "Digital Media".
+     * Releases with zero media are excluded (no format info).
+     * @param {object} release
+     * @returns {boolean}
+     */
+    function isDigitalRelease(release) {
+        const media = release.media || [];
+        if (media.length === 0) return false;
+        return media.every((m) => m.format === 'Digital Media');
+    }
+
+    /**
+     * Extract the MBID of the release that the CAA "front" image is from.
+     * @param {object|null} caaData
+     * @returns {string|null}
+     */
+    function currentCoverReleaseMbid(caaData) {
+        if (!caaData || !Array.isArray(caaData.images)) return null;
+        const front = caaData.images.find((img) => img.front === true);
+        if (!front || typeof front.release !== 'string') return null;
+        const m = front.release.match(/\/release\/([0-9a-f-]{36})/i);
+        return m ? m[1].toLowerCase() : null;
+    }
+
+    /**
+     * Classify the release group: list digital releases, identify current
+     * cover source, determine whether the current cover is from a digital
+     * release.
+     *
+     * @param {object} mbData  - MB WS release-group payload
+     * @param {object|null} caaData  - CAA release-group JSON payload (nullable)
+     * @returns {{
+     *   allReleases: object[],
+     *   digitalReleases: object[],
+     *   currentCoverMbid: string|null,
+     *   currentCoverIsDigital: boolean,
+     * }}
+     */
+    function classifyReleases(mbData, caaData) {
+        const allReleases = mbData.releases || [];
+        const digitalReleases = allReleases.filter(isDigitalRelease);
+        const currentCoverMbid = currentCoverReleaseMbid(caaData);
+        const currentCoverIsDigital =
+            !!currentCoverMbid && digitalReleases.some((r) => r.id === currentCoverMbid);
+        return { allReleases, digitalReleases, currentCoverMbid, currentCoverIsDigital };
+    }
+
+    // ---------------------------------------------------------------------------
     // Entry point / mode dispatch
     // ---------------------------------------------------------------------------
 
