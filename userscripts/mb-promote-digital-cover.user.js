@@ -37,15 +37,19 @@
     }
 
     /**
-     * Find the release group MBID from a release view page by reading the
-     * sidebar link `a[href^="/release-group/..."]`.
+     * Find the release group MBID from a release view page by scanning
+     * `a[href^="/release-group/..."]` links for the first one whose href
+     * contains a valid MBID. MB includes a `/release-group/create` menu
+     * link on every page, so we can't just take the first match.
      * @returns {string|null}
      */
     function releaseGroupMbidFromReleasePage() {
-        const link = document.querySelector('a[href^="/release-group/"]');
-        if (!link) return null;
-        const m = link.getAttribute('href').match(/\/release-group\/([0-9a-f-]{36})/i);
-        return m ? m[1].toLowerCase() : null;
+        const links = document.querySelectorAll('a[href^="/release-group/"]');
+        for (const link of links) {
+            const m = link.getAttribute('href').match(/\/release-group\/([0-9a-f-]{36})/i);
+            if (m) return m[1].toLowerCase();
+        }
+        return null;
     }
 
     // ---------------------------------------------------------------------------
