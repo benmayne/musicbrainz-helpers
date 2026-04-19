@@ -175,6 +175,11 @@ def _process_album(album, mode):
         )
         return
 
+    log.debug(
+        '[promote-digital-cover] processing album=%s rg=%s mode=%s',
+        getattr(album, 'id', None), rg_mbid, mode,
+    )
+
     def on_browse_done(document, http, error):
         _on_browse_done(album, mode, rg_mbid, document, http, error)
 
@@ -203,14 +208,14 @@ def _on_browse_done(album, mode, rg_mbid, document, http, error):
     # Early bail-out: no digital releases at all → remove immediately.
     if not any(_is_digital_release(r) for r in releases):
         classified = _classify(releases, None)
-        _finalize(album, mode, classified)
+        _finalize(album, mode, rg_mbid, classified)
         return
 
     # Try local image first for the current-cover source.
     source_mbid = _source_mbid_from_local_images(album)
     if source_mbid is not None:
         classified = _classify(releases, source_mbid)
-        _finalize(album, mode, classified)
+        _finalize(album, mode, rg_mbid, classified)
         return
 
     # Fall back to CAA.
@@ -229,19 +234,40 @@ def _on_caa_done(album, mode, rg_mbid, releases, data, http, error):
         # Other errors: log and keep the album (no _finalize call = no remove).
         if error == QNetworkReply.NetworkError.ContentNotFoundError:
             classified = _classify(releases, None)
-            _finalize(album, mode, classified)
+            _finalize(album, mode, rg_mbid, classified)
             return
         _log_fetch_failure('CAA release-group', rg_mbid, http, error)
         return
 
     current_mbid = _current_cover_mbid_from_caa(data if isinstance(data, dict) else None)
     classified = _classify(releases, current_mbid)
-    _finalize(album, mode, classified)
+    _finalize(album, mode, rg_mbid, classified)
 
 
-def _finalize(album, mode, classified):
+def _finalize(album, mode, rg_mbid, classified):
+    """Apply the keep predicate, log the decision, and remove the album if needed."""
+    album_mbid = getattr(album, 'id', None)
+    cover_mbid = classified['current_cover_mbid']
+    digital_mbids = [r.get('id') for r in classified['digital_releases']]
+
     if _keep_album(classified, mode):
+        log.debug(
+            '[promote-digital-cover] keep album=%s rg=%s mode=%s cover=%s digitals=%s',
+            album_mbid, rg_mbid, mode, cover_mbid, digital_mbids,
+        )
         return
+
+    if classified['current_cover_is_digital']:
+        reason = 'current RG cover already from digital release'
+    elif not classified['digital_releases']:
+        reason = 'no digital release in RG'
+    else:
+        reason = 'no digital release has usable cover art (strict mode)'
+
+    log.debug(
+        '[promote-digital-cover] remove album=%s rg=%s mode=%s cover=%s digitals=%s reason=%s',
+        album_mbid, rg_mbid, mode, cover_mbid, digital_mbids, reason,
+    )
     album.tagger.remove_album(album)
 
 
