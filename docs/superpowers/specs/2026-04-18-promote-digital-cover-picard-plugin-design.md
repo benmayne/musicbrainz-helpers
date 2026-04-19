@@ -49,34 +49,28 @@ A Picard 2.x plugin that bulk-filters loaded albums, keeping only those whose re
 
 For each loaded album in `objs`:
 
-1. **Look up cached RG classification** by `album.metadata['musicbrainz_releasegroupid']`.
-2. If not cached, kick off the fetch pipeline for that RG:
+1. Kick off the fetch pipeline for the album's RG (`album.metadata['musicbrainz_releasegroupid']`):
    - **Always**: `tagger.mb_api.browse_releases(handler, **{'release-group': rgMbid, 'limit': 100})` with a custom handler that retains the full JSON (keeps `media[].format` and `cover-art-archive` per release).
-   - **Conditionally**: the CAA source lookup — only when digital releases exist and we don't already know the source:
+   - **Conditionally** (only when the browse response shows digital releases exist and we don't already know the source):
      - **First try local**: scan `album.metadata.images` for a `CaaCoverArtImageRg` instance. If present, parse the source release MBID from its URL (path contains `/release/<mbid>/<image-id>.jpg`).
      - **Fallback to CAA**: `tagger.webservice.get_url('https://coverartarchive.org/release-group/<rgMbid>', handler=...)`. Parse the front image's `image` URL for the source MBID.
-3. **On fetch completion**, classify the RG:
+2. **On fetch completion**, classify the RG:
    - `digitalReleases` = releases where every medium is `Digital Media`.
    - `currentCoverMbid` = from the CAA response (or from local `CaaCoverArtImageRg`, or null if neither has it).
    - `currentCoverIsDigital` = `currentCoverMbid in digitalReleases`.
-   - Cache this result.
-4. **Apply the mode's keep rule** to the album. If it fails, call `tagger.remove_album(album)` and run `QCoreApplication.processEvents()`.
+3. **Apply the mode's keep rule** to the album. If it fails, call `tagger.remove_album(album)` and run `QCoreApplication.processEvents()`.
 
-### Cache
+No cross-album caching in v1. If two albums happen to be in the same RG, we fetch twice — rare in practice and not worth the added complexity.
 
-Module-level `dict` keyed by RG MBID. Lifetime = Picard process. No invalidation logic in v1.
-
-Cache value includes: `digitalReleases` (list of release dicts from the MB response), `currentCoverMbid` (string or None), `currentCoverIsDigital` (bool).
-
-### Per-RG API cost
+### Per-album API cost
 
 | RG state | browse_releases | CAA lookup |
 |---|---|---|
 | Has no digital releases | 1 | 0 (skipped after browse reveals no digital) |
-| Has digital releases, `CaaCoverArtImageRg` cached locally | 1 | 0 |
-| Has digital releases, no local image cache | 1 | 1 |
+| Has digital releases, `CaaCoverArtImageRg` present on the album | 1 | 0 |
+| Has digital releases, no local image data | 1 | 1 |
 
-Best case for users who prefer RG art in Picard settings: one `browse_releases` call per unique RG.
+Best case for users who prefer RG art in Picard settings: one `browse_releases` call per album.
 
 ### Execution model
 
