@@ -45,9 +45,17 @@
     // ---------------------------------------------------------------------------
 
     const path = location.pathname;
-    const SET_COVER_ART_RE = /^\/release-group\/([0-9a-f-]{36})\/set-cover-art\/?$/i;
-    const RELEASE_GROUP_RE = /^\/release-group\/([0-9a-f-]{36})\/?$/i;
+
+    // Permissive regexes used by helpers to extract MBIDs from any
+    // release / release-group URL (including subpages).
+    const RELEASE_GROUP_RE = /^\/release-group\/([0-9a-f-]{36})(?:\/|$)/i;
     const RELEASE_RE = /^\/release\/([0-9a-f-]{36})(?:\/|$)/i;
+
+    // Strict regexes that identify which mode to run. Using an allow-list
+    // (only the bare view pages or the exact set-cover-art edit page) is
+    // safer than maintaining a denylist of MB subpages.
+    const BUTTON_MODE_RE = /^\/release(?:-group)?\/[0-9a-f-]{36}\/?$/i;
+    const SET_COVER_ART_RE = /^\/release-group\/([0-9a-f-]{36})\/set-cover-art\/?$/i;
 
     if (SET_COVER_ART_RE.test(path)) {
         console.log('[promote-digital-cover] preview mode');
@@ -55,12 +63,7 @@
         return;
     }
 
-    if (RELEASE_GROUP_RE.test(path) || RELEASE_RE.test(path)) {
-        // Skip edit sub-pages of releases (e.g. /release/<id>/edit, /release/<id>/add-cover-art).
-        // Only run button mode on the main release or release-group view pages.
-        const isEditSubpage = /\/(edit|add-cover-art|cover-art|disc|discids)(\/|$)/i.test(path);
-        if (isEditSubpage) return;
-
+    if (BUTTON_MODE_RE.test(path)) {
         console.log('[promote-digital-cover] button mode');
         // runButtonMode() — added in later tasks
         return;
