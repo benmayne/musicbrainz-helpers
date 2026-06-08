@@ -2,7 +2,7 @@
 // @name         Import Amazon Audiobooks into MusicBrainz
 // @namespace    https://github.com/benmayne/musicbrainz-helpers
 // @description  One-click importing of audiobook releases from Amazon into MusicBrainz
-// @version      0.7
+// @version      0.8
 // @updateURL    https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @downloadURL  https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @match        https://www.amazon.com/*/dp/*
@@ -28,7 +28,7 @@
     const MB_ADD_RELEASE_URL = 'https://musicbrainz.org/release/add';
 
     // Keep in sync with the @version metadata above (used in the edit note).
-    const SCRIPT_VERSION = '0.7';
+    const SCRIPT_VERSION = '0.8';
 
     const LANGUAGE_MAP = {
         english: 'eng',
@@ -83,26 +83,47 @@
     // ---------------------------------------------------------------------------
 
     /**
-     * Search product details table rows for a matching header label and return
-     * the corresponding cell value.
+     * Find a product detail value by label across the two layouts Amazon serves:
+     * the product-details table (#audibleProductDetails etc.) and the detail
+     * bullets list (#detailBullets_feature_div). Which one renders varies by
+     * A/B bucket, so we check both.
      * @param {string} label
      * @returns {string|null}
      */
     function getProductDetail(label) {
+        const wanted = label.toLowerCase();
+
+        // Layout A: product details tables (header cell + value cell per row).
         const rows = document.querySelectorAll(
             '#productDetails_techSpec_section_1 tr, #audibleProductDetails tr, [class*="productDetails"] tr'
         );
-
         for (const row of rows) {
             const header = row.querySelector('th, td:first-child');
             if (!header) continue;
-            if (header.textContent.trim().toLowerCase().includes(label.toLowerCase())) {
+            if (header.textContent.trim().toLowerCase().includes(wanted)) {
                 const valueCell = row.querySelector('td:last-child');
                 if (valueCell) {
                     return valueCell.textContent.trim();
                 }
             }
         }
+
+        // Layout B: detail bullets, each "Label : Value" on one <li>. Amazon wraps
+        // the colon in bidi marks (‎/‏), so strip those and split on the
+        // first colon.
+        const bullets = document.querySelectorAll(
+            '#detailBullets_feature_div li, #detailBulletsWrapper_feature_div li'
+        );
+        for (const li of bullets) {
+            const text = li.textContent.replace(/\s+/g, ' ').trim();
+            const idx = text.indexOf(':');
+            if (idx === -1) continue;
+            const key = text.slice(0, idx).replace(/[‎‏]/g, '').trim().toLowerCase();
+            if (key.includes(wanted)) {
+                return text.slice(idx + 1).replace(/[‎‏]/g, '').trim();
+            }
+        }
+
         return null;
     }
 
