@@ -2,7 +2,7 @@
 // @name         Import Amazon Audiobooks into MusicBrainz
 // @namespace    https://github.com/benmayne/musicbrainz-helpers
 // @description  One-click importing of audiobook releases from Amazon into MusicBrainz
-// @version      0.4
+// @version      0.6
 // @updateURL    https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @downloadURL  https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @match        https://www.amazon.com/*/dp/*
@@ -230,14 +230,16 @@
         add('language', data.language);
         add('script', 'Latn');
 
-        add('date.year', data.year);
-        add('date.month', data.month);
-        add('date.day', data.day);
+        add('events.0.date.year', data.year);
+        add('events.0.date.month', data.month);
+        add('events.0.date.day', data.day);
 
         add('labels.0.name', data.publisher);
 
         add('mediums.0.format', 'Digital Media');
-        add('mediums.0.track.0.name', data.title);
+        // Drop subtitles from the track name (e.g. "Title: A Subtitle" -> "Title")
+        const trackName = data.title ? data.title.split(':')[0].trim() : data.title;
+        add('mediums.0.track.0.name', trackName);
         if (data.durationMs !== null && data.durationMs !== undefined) {
             add('mediums.0.track.0.length', data.durationMs);
         }
