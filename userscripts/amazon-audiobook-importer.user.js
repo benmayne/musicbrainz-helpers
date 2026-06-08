@@ -2,7 +2,7 @@
 // @name         Import Amazon Audiobooks into MusicBrainz
 // @namespace    https://github.com/benmayne/musicbrainz-helpers
 // @description  One-click importing of audiobook releases from Amazon into MusicBrainz
-// @version      0.3
+// @version      0.4
 // @updateURL    https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @downloadURL  https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @match        https://www.amazon.com/*/dp/*
@@ -330,6 +330,16 @@
      * Returns true if the page appears to be an Audible Audiobook product.
      */
     function isAudiobook() {
+        // Strong, language-independent signal: the Audible product details block
+        // is only rendered on Audible audiobook pages (works across locales).
+        if (document.querySelector('#audibleProductDetails')) return true;
+
+        // Newer layouts no longer put the format label under the title; check the
+        // selected format swatch instead.
+        const swatch = document.querySelector('#tmmSwatches .selected, .swatchElement.selected');
+        if (swatch && /audiobook/i.test(swatch.textContent)) return true;
+
+        // Fallback for older layouts: format label rendered near the title.
         const section =
             document.querySelector('#title_feature_div') ||
             document.querySelector('#titleSection') ||

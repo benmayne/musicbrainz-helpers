@@ -2,7 +2,7 @@
 // @name         MusicBrainz: Promote Digital Cover Art
 // @namespace    https://github.com/benmayne/musicbrainz-helpers
 // @description  Suggest promoting a digital release's cover art to the release-group level; preview old vs new on the set-cover-art page.
-// @version      0.1
+// @version      0.2
 // @updateURL    https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/mb-promote-digital-cover.user.js
 // @downloadURL  https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/mb-promote-digital-cover.user.js
 // @match        https://musicbrainz.org/release/*
@@ -516,9 +516,10 @@
     const RELEASE_RE = /^\/release\/([0-9a-f-]{36})(?:\/|$)/i;
 
     // Strict regexes that identify which mode to run. Using an allow-list
-    // (only the bare view pages or the exact set-cover-art edit page) is
-    // safer than maintaining a denylist of MB subpages.
-    const BUTTON_MODE_RE = /^\/release(?:-group)?\/[0-9a-f-]{36}\/?$/i;
+    // (bare view pages, the release /cover-art viewer, or the exact
+    // set-cover-art edit page) is safer than maintaining a denylist of
+    // MB subpages.
+    const BUTTON_MODE_RE = /^(?:\/release-group\/[0-9a-f-]{36}|\/release\/[0-9a-f-]{36}(?:\/cover-art)?)\/?$/i;
     const SET_COVER_ART_RE = /^\/release-group\/([0-9a-f-]{36})\/set-cover-art\/?$/i;
 
     if (SET_COVER_ART_RE.test(path)) {
