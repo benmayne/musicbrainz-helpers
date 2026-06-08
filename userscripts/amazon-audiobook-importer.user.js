@@ -2,7 +2,7 @@
 // @name         Import Amazon Audiobooks into MusicBrainz
 // @namespace    https://github.com/benmayne/musicbrainz-helpers
 // @description  One-click importing of audiobook releases from Amazon into MusicBrainz
-// @version      0.6
+// @version      0.7
 // @updateURL    https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @downloadURL  https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @match        https://www.amazon.com/*/dp/*
@@ -26,6 +26,9 @@
     // ---------------------------------------------------------------------------
 
     const MB_ADD_RELEASE_URL = 'https://musicbrainz.org/release/add';
+
+    // Keep in sync with the @version metadata above (used in the edit note).
+    const SCRIPT_VERSION = '0.7';
 
     const LANGUAGE_MAP = {
         english: 'eng',
@@ -247,7 +250,7 @@
         add('urls.0.url', data.url);
         add('urls.0.link_type', '77'); // Amazon ASIN
 
-        add('edit_note', `Imported from ${data.url} using userscripts from https://github.com/benmayne/musicbrainz-helpers/`);
+        add('edit_note', `Imported from ${data.url} using amazon-audiobook-importer v${SCRIPT_VERSION} from https://github.com/benmayne/musicbrainz-helpers/`);
 
         // Artist credits
         if (data.author) {
