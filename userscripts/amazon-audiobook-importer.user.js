@@ -2,7 +2,7 @@
 // @name         Import Amazon Audiobooks into MusicBrainz
 // @namespace    https://github.com/benmayne/musicbrainz-helpers
 // @description  One-click importing of audiobook releases from Amazon into MusicBrainz
-// @version      0.8
+// @version      0.9
 // @updateURL    https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @downloadURL  https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @match        https://www.amazon.com/*/dp/*
@@ -28,7 +28,7 @@
     const MB_ADD_RELEASE_URL = 'https://musicbrainz.org/release/add';
 
     // Keep in sync with the @version metadata above (used in the edit note).
-    const SCRIPT_VERSION = '0.8';
+    const SCRIPT_VERSION = '0.9';
 
     const LANGUAGE_MAP = {
         english: 'eng',
@@ -128,6 +128,53 @@
     }
 
     // ---------------------------------------------------------------------------
+    // Helper: byline contributors
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Collect every byline contributor, grouped by role.
+     *
+     * Amazon wraps each contributor in its own element holding the name link
+     * plus a "(Author, Narrator)" role label, so roles are only read from that
+     * wrapper. Looking further up the tree would see every role on the byline
+     * and credit them all to whichever name came first.
+     *
+     * @returns {{authors: string[], narrators: string[]}}
+     */
+    function parseContributors() {
+        const authors = [];
+        const narrators = [];
+
+        const links = document.querySelectorAll(
+            '.authorNameColumn a, #bylineInfo a, [class*="byline"] a'
+        );
+
+        for (const link of links) {
+            const name = link.textContent.trim();
+            if (!name) continue;
+
+            const wrapper = link.closest('.author, .authorNameColumn') || link.parentElement;
+            if (!wrapper) continue;
+
+            // Prefer the explicit role label; otherwise fall back to the
+            // wrapper's own text, but only when it describes a single person.
+            const roleEl = wrapper.querySelector('.contribution');
+            let roles = null;
+            if (roleEl) {
+                roles = roleEl.textContent;
+            } else if (wrapper.querySelectorAll('a').length === 1) {
+                roles = wrapper.textContent;
+            }
+            if (!roles) continue;
+
+            if (/\bauthors?\b/i.test(roles) && !authors.includes(name)) authors.push(name);
+            if (/\bnarrators?\b/i.test(roles) && !narrators.includes(name)) narrators.push(name);
+        }
+
+        return { authors, narrators };
+    }
+
+    // ---------------------------------------------------------------------------
     // Main scraper
     // ---------------------------------------------------------------------------
 
@@ -153,35 +200,10 @@
             data.title = title || null;
         }
 
-        // --- Author & Narrator ---
-        // Look through all byline links and check the parent element text for role hints
-        const bylineLinks = document.querySelectorAll(
-            '.authorNameColumn a, #bylineInfo a, [class*="byline"] a'
-        );
-
-        for (const link of bylineLinks) {
-            const name = link.textContent.trim();
-            if (!name) continue;
-
-            // Walk up to find the containing element that mentions the role
-            let container = link.parentElement;
-            while (container && container !== document.body) {
-                const text = container.textContent;
-                const hasAuthor = /\bAuthor\b/.test(text);
-                const hasNarrator = /\bNarrator\b/.test(text);
-                if (hasAuthor) {
-                    if (!data.author) data.author = name;
-                }
-                if (hasNarrator) {
-                    if (!data.narrator) data.narrator = name;
-                }
-                if (hasAuthor || hasNarrator) break;
-                container = container.parentElement;
-            }
-
-            // Stop once we have both
-            if (data.author && data.narrator) break;
-        }
+        // --- Authors & narrators ---
+        const contributors = parseContributors();
+        data.authors = contributors.authors;
+        data.narrators = contributors.narrators;
 
         // --- Product details (duration, release date, publisher, language, ASIN) ---
         const durationRaw = getProductDetail('Listening Length') || getProductDetail('Duration');
@@ -226,6 +248,51 @@
         data.url = window.location.origin + pathname;
 
         return data;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Artist credit builder
+    // ---------------------------------------------------------------------------
+
+    /**
+     * True if both lists name the same people, regardless of order.
+     * @param {string[]} a
+     * @param {string[]} b
+     */
+    function sameNames(a, b) {
+        return a.length === b.length && a.every((name) => b.includes(name));
+    }
+
+    /**
+     * Build the MusicBrainz artist credit as "$authors read by $narrators",
+     * per the audiobook style guide. Multiple names within a role use the
+     * default join phrases: "A", "A & B", "A, B & C".
+     *
+     * The narrator half is dropped for self-narrated books, where the
+     * narrators are exactly the authors.
+     *
+     * @param {string[]} authors
+     * @param {string[]} narrators
+     * @returns {Array<{name: string, joinPhrase: string}>}
+     */
+    function buildArtistCredits(authors, narrators) {
+        const readBy = sameNames(authors, narrators) ? [] : narrators;
+        const credits = [];
+
+        const appendGroup = (names, trailingPhrase) => {
+            names.forEach((name, i) => {
+                const remaining = names.length - 1 - i;
+                let joinPhrase = trailingPhrase;
+                if (remaining === 1) joinPhrase = ' & ';
+                else if (remaining > 1) joinPhrase = ', ';
+                credits.push({ name, joinPhrase });
+            });
+        };
+
+        appendGroup(authors, readBy.length ? ' read by ' : '');
+        appendGroup(readBy, '');
+
+        return credits;
     }
 
     // ---------------------------------------------------------------------------
@@ -274,14 +341,11 @@
         add('edit_note', `Imported from ${data.url} using amazon-audiobook-importer v${SCRIPT_VERSION} from https://github.com/benmayne/musicbrainz-helpers/`);
 
         // Artist credits
-        if (data.author) {
-            add('artist_credit.names.0.artist.name', data.author);
-
-            if (data.narrator && data.narrator !== data.author) {
-                add('artist_credit.names.0.join_phrase', ' read by ');
-                add('artist_credit.names.1.artist.name', data.narrator);
-            }
-        }
+        const credits = buildArtistCredits(data.authors || [], data.narrators || []);
+        credits.forEach((credit, i) => {
+            add(`artist_credit.names.${i}.artist.name`, credit.name);
+            add(`artist_credit.names.${i}.join_phrase`, credit.joinPhrase);
+        });
 
         return params;
     }
