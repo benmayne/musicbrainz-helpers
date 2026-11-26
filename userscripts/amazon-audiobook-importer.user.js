@@ -2,7 +2,7 @@
 // @name         Import Amazon Audiobooks into MusicBrainz
 // @namespace    https://github.com/benmayne/musicbrainz-helpers
 // @description  One-click importing of audiobook releases from Amazon into MusicBrainz
-// @version      0.10
+// @version      0.11
 // @updateURL    https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @downloadURL  https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @match        https://www.amazon.com/*/dp/*
@@ -33,7 +33,7 @@
     const MB_ADD_RELEASE_URL = 'https://musicbrainz.org/release/add';
 
     // Keep in sync with the @version metadata above (used in the edit note).
-    const SCRIPT_VERSION = '0.10';
+    const SCRIPT_VERSION = '0.11';
 
     const LANGUAGE_MAP = {
         english: 'eng',
@@ -434,14 +434,21 @@
         const swatch = document.querySelector('#tmmSwatches .selected, .swatchElement.selected');
         if (swatch && /audiobook/i.test(swatch.textContent)) return true;
 
-        // Fallback for older layouts: format label rendered near the title.
-        const section =
-            document.querySelector('#title_feature_div') ||
-            document.querySelector('#titleSection') ||
-            document.querySelector('#centerCol');
+        // Some signed-in layouts render no format swatches at all. Byline
+        // contributors on audiobook pages link into the Audible search alias,
+        // which holds regardless of locale.
+        if (document.querySelector(
+            '#bylineInfo a[href*="search-alias=audible"], #bylineInfo a[href*="byline_sr_audible"]'
+        )) return true;
 
-        if (!section) return false;
-        return /audible audiobook/i.test(section.textContent);
+        // Fallback: "Format: Audible Audiobook" label near the title or byline.
+        const sections = document.querySelectorAll(
+            '#title_feature_div, #titleSection, #bylineInfo_feature_div, #bylineInfo'
+        );
+        for (const section of sections) {
+            if (/audible audiobook/i.test(section.textContent)) return true;
+        }
+        return false;
     }
 
     // ---------------------------------------------------------------------------
