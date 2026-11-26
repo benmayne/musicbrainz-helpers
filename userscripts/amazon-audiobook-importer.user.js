@@ -2,19 +2,24 @@
 // @name         Import Amazon Audiobooks into MusicBrainz
 // @namespace    https://github.com/benmayne/musicbrainz-helpers
 // @description  One-click importing of audiobook releases from Amazon into MusicBrainz
-// @version      0.9
+// @version      0.10
 // @updateURL    https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @downloadURL  https://raw.githubusercontent.com/benmayne/musicbrainz-helpers/main/userscripts/amazon-audiobook-importer.user.js
 // @match        https://www.amazon.com/*/dp/*
 // @match        https://www.amazon.com/dp/*
+// @match        https://www.amazon.com/gp/product/*
 // @match        https://www.amazon.co.uk/*/dp/*
 // @match        https://www.amazon.co.uk/dp/*
+// @match        https://www.amazon.co.uk/gp/product/*
 // @match        https://www.amazon.de/*/dp/*
 // @match        https://www.amazon.de/dp/*
+// @match        https://www.amazon.de/gp/product/*
 // @match        https://www.amazon.fr/*/dp/*
 // @match        https://www.amazon.fr/dp/*
+// @match        https://www.amazon.fr/gp/product/*
 // @match        https://www.amazon.co.jp/*/dp/*
 // @match        https://www.amazon.co.jp/dp/*
+// @match        https://www.amazon.co.jp/gp/product/*
 // @grant        none
 // ==/UserScript==
 
@@ -28,7 +33,7 @@
     const MB_ADD_RELEASE_URL = 'https://musicbrainz.org/release/add';
 
     // Keep in sync with the @version metadata above (used in the edit note).
-    const SCRIPT_VERSION = '0.9';
+    const SCRIPT_VERSION = '0.10';
 
     const LANGUAGE_MAP = {
         english: 'eng',
@@ -238,7 +243,7 @@
 
         // ASIN fallback: extract from URL path
         if (!data.asin) {
-            const asinMatch = window.location.pathname.match(/\/dp\/([A-Z0-9]+)/i);
+            const asinMatch = window.location.pathname.match(/\/(?:dp|gp\/product)\/([A-Z0-9]+)/i);
             if (asinMatch) data.asin = asinMatch[1].toUpperCase();
         }
 
